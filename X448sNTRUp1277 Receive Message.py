@@ -3,9 +3,6 @@ from base64 import b64encode
 from base64 import b64decode
 import secrets
 import hashlib
-import time
-import oqs.rand as rand
-
 
 #First Define Finite Fields used in Curve448
 def FiniteField(p):
@@ -125,47 +122,43 @@ def blake2bencrypt(key, plaintext):
 
     return ciphertext
 
-# Key Encapsulation Using NIST Level 5 algorithm Streamlined NTRU Prime 1277 and ECIES with Goldilocks-448
+# Key Decapsulation Using NIST Level 5 algorithm Streamlined NTRU Prime 1277 and ECIES X448
+
 kemalg = "sntrup1277"
 
-print ("Input Public Key of Recipient")
+print ("Input Your Secret Key:")
 
-rawpublickeys = input().encode()
-publickeysbytes = b64decode(rawpublickeys)
+rawsecretkeys = input().encode()
+secretkeysbytes = b64decode(rawsecretkeys)
+
+secretkey1 = secretkeysbytes[:3059]
+secretkey2 = secretkeysbytes[-56:]
+print()
+
+print ("Input Ciphertext:")
+
+rawciphertext = input().encode()
+rawbytes = b64decode(rawciphertext)
+
+ciphertextbytes = rawbytes[0:1903]
+ciphertext3 = rawbytes[1903:]
+
+
+
+ciphertext1 = ciphertextbytes[:1847]
+ciphertext2 = ciphertextbytes[-56:]
+
+ntruprime = oqs.KeyEncapsulation(kemalg, secretkey1)
+
+shared_secret1 = ntruprime.decap_secret(ciphertext1)
+
+
+shared_secret2 = x448(secretkey2, ciphertext2)
+sharedkeys = (shared_secret1+shared_secret2)
+key1 = bytearray(hashlib.blake2b(sharedkeys).digest())
+
+message = (blake2bencrypt(key1, ciphertext3))
 
 print()
-print("Input message:")
-message = bytearray(input().encode())
-print()
-print("Input text entropy for ephemeral keys:")
-entropy = bytearray(input().encode())
-
-publickey1 = publickeysbytes[:2067]
-publickey2 = publickeysbytes[-56:]
-
-ntruprime = oqs.KeyEncapsulation(kemalg)
-
-#Decision to only trust Windows' closed source CSPRNG mostly but not completely
-seed1 = (hashlib.blake2b(bytearray(secrets.token_bytes(64))+entropy+bytearray(hex(int(time.time_ns())), 'utf-8')).digest())[:48]
-rand.randombytes_nist_kat_init_256bit(seed1)
-rand.randombytes_switch_algorithm("NIST-KAT")
-
-seed2 = bytearray((hashlib.blake2b(bytearray(secrets.token_bytes(64))+entropy+bytearray(hex(int(time.time_ns())), 'utf-8')).digest()))[:56]
-
-ciphertext1, shared_secret1 = ntruprime.encap_secret(publickey1)
-
-#ECIES using an emphermal public key to turn X448 into a KEM
-ephemsec = seed2
-ephempub = x448(ephemsec, base_point)
-shared_secret2 = x448(ephemsec, publickey2)
-
-ciphertext2 = ephempub
-
-#Encrypt plaintext using the shared keys from NTRU Prime and X448
-key1 = bytearray(hashlib.blake2b(shared_secret1+shared_secret2).digest())
-ciphertext3= blake2bencrypt(key1, message)
-
-print()
-print ("Ciphertext:", b64encode(ciphertext1+ciphertext2+ciphertext3).decode())
-
+print ("Plaintext:", message.decode())
 input()

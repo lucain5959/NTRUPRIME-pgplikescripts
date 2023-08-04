@@ -7,7 +7,7 @@ import base64
 import hashlib
 import oqs.rand as rand
 
-#Define Curve448
+#First Define Finite Fields used in Curve448
 def FiniteField(p):
     class Fp:
         def __init__(self, val: int):
@@ -30,7 +30,7 @@ def FiniteField(p):
     Fp.p = p
     return Fp
 
-# 5.  The X25519 and X448 Functions
+#X448 Functions
 
 def decodeLittleEndian(b, bits):
     return sum([ b[i] << 8*i for i in range((bits+7)//8) ])
@@ -44,13 +44,6 @@ def decodeUCoordinate(u, bits):
 
 def encodeUCoordinate(u, bits):
     return bytearray([ (u >> 8*i) & 0xff for i in range((bits+7)//8) ])
-
-def decodeScalar25519(k):
-    k_list = [b for b in k]
-    k_list[0] &= 248
-    k_list[31] &= 127
-    k_list[31] |= 64
-    return decodeLittleEndian(k_list, 255)
 
 def decodeScalar448(k):
     k_list = [b for b in k]
@@ -100,6 +93,7 @@ def mul(k: int, u: int, bits: int, p: int, a24: int):
     res = x_2 * (z_2**(p - 2))
     return res
 
+#Define X448 key exchange
 def x448(k: bytes, u: bytes):
     # Curve448 for the ~224-bit security level.
     bits = 448
@@ -116,9 +110,11 @@ base_point = encodeUCoordinate(5, bits=448)
 print ("Input text entropy for key generation")
 entropy = bytearray(input().encode())
 
+print()
+
 # Key Generation Using NIST Level 5 algorithm Streamlined NTRU Prime 1277 and Curve448
 
-kemalg1 = "sntrup1277"
+kemalg = "sntrup1277"
 
 seed1 = (hashlib.blake2b(bytearray(secrets.token_bytes(64))+entropy+bytearray(hex(int(time.time_ns())), 'utf-8')).digest())[:48]
 rand.randombytes_nist_kat_init_256bit(seed1)
@@ -126,9 +122,9 @@ rand.randombytes_switch_algorithm("NIST-KAT")
 
 
 seed2 = (bytearray(hashlib.blake2b(bytearray(secrets.token_bytes(64))+entropy+bytearray(hex(int(time.time_ns())), 'utf-8')).digest()))[:56]
-client = oqs.KeyEncapsulation(kemalg1)
-publickey1 =client.generate_keypair()
-secretkey1 = client.export_secret_key()
+ntruprime = oqs.KeyEncapsulation(kemalg)
+publickey1 =ntruprime.generate_keypair()
+secretkey1 = ntruprime.export_secret_key()
 
 
 secretkey2 = seed2
